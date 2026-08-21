@@ -1,0 +1,1372 @@
+/* popup.css — white + pastel theme (§9.2) */
+
+:root {
+  --bg: #ffffff;
+  --surface: #fbfcfe;
+  --border: #eef1f6;
+  --text: #2b2f36;
+  --muted: #7a828e;
+  --accent: #a9c8ff; /* pastel blue */
+  --accent-strong: #5b8def; /* readable blue for buttons/text */
+  --accent-soft: #eaf2ff; /* pastel blue tint */
+  --accent-2: #cdeede; /* pastel mint */
+  --highlight: #fff3b0; /* pastel yellow for matched text */
+  --danger: #f6c9c9;
+  --radius: 10px;
+  --radius-sm: 7px;
+  --shadow: 0 1px 3px rgba(30, 40, 60, 0.06);
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+
+  /* Code, menu, and autocomplete panel backgrounds */
+  --code-bg: #fff;
+  /* Danger (red) text + soft fills */
+  --danger-text: #a5504f;
+  --danger-soft: #fff1f1;
+  --toast-bg: #fff6f6;
+  /* Success (green) text + tints (diff added lines, badges, status) */
+  --success-text: #4f9d78;
+  --diff-add-text: #2b7a4f;
+  --success-soft: #f0faf3;
+  --success-softer: #e6f7ed;
+  /* Diff removed-line tints */
+  --diff-del-soft: #fef3f3;
+  --diff-del-softer: #fdf0f0;
+  --diff-del-muted: #c47474;
+  --warn-text: #b58a2e;
+  /* Code line-number gutter */
+  --ln-color: #b7bdc7;
+  /* Matched-line warm tint */
+  --notice-bg: #fffdf2;
+  /* Syntax token colors */
+  --token-comment: #8a97a3;
+  --token-string: #b0673a; /* strings + template literals */
+  --token-keyword: #7c5cc4;
+  --token-number: #2f8f6b;
+  --token-function: #3a6ea5;
+  --token-regex: #a15c9e;
+  --token-punct: #8b93a0;
+  /* Text on accent-colored highlights */
+  --on-accent: #fff;
+  /* Status dots (pastels read on both themes) */
+  --dot-ok: #8bd6ac;
+  --dot-warn: #f0c36d;
+  /* Diff stat pills (green = additions, red = removals) */
+  --pill-ok-bg: #dcfce7;
+  --pill-ok-text: #166534;
+  --pill-err-bg: #fee2e2;
+  --pill-err-text: #991b1b;
+  /* Darken-on-hover tints for tinted header rows */
+  --header-hover: rgba(0, 0, 0, 0.04);
+  --group-hover: rgba(0, 0, 0, 0.03);
+  --shadow-menu: 0 4px 14px rgba(30, 40, 60, 0.12);
+  --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ---- Dark theme (applied as data-theme="dark" on <html>) ---- */
+html[data-theme="dark"] {
+  --bg: #14171c;
+  --surface: #1b2027;
+  --border: #2b323d;
+  --text: #e4e8ee;
+  --muted: #96a0ac;
+  --accent: #40608f; /* blue gradient/border tint */
+  --accent-strong: #5b8def; /* kept: white/soft fills stay readable */
+  --accent-soft: #223350;
+  --accent-2: #2d5f55; /* dark mint for the logo gradient */
+  --highlight: #4d4014; /* dark warm tint, matched text stays readable */
+  --danger: #7e3a3a;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  --code-bg: #10141a;
+  --danger-text: #e29a99;
+  --danger-soft: #2c1b1b;
+  --toast-bg: #2c1b1b;
+  --success-text: #82c9a2;
+  --diff-add-text: #82c9a2;
+  --success-soft: #12261c;
+  --success-softer: #1a3628;
+  --diff-del-soft: #2c1b1b;
+  --diff-del-softer: #362020;
+  --diff-del-muted: #d99f9f;
+  --warn-text: #d9a84e;
+  --ln-color: #7f8894;
+  --notice-bg: #26220f;
+  --token-comment: #9aa7b4;
+  --token-string: #d98f57;
+  --token-keyword: #a98fe0;
+  --token-number: #5fbf95;
+  --token-function: #7aa5d8;
+  --token-regex: #c98fc9;
+  --token-punct: #9aa1ad;
+  --pill-ok-bg: #152820;
+  --pill-ok-text: #82c9a2;
+  --pill-err-bg: #362020;
+  --pill-err-text: #e29a99;
+  --header-hover: rgba(255, 255, 255, 0.06);
+  --group-hover: rgba(255, 255, 255, 0.05);
+  --shadow-menu: 0 4px 14px rgba(0, 0, 0, 0.55);
+  --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.55);
+  /* --on-accent, --dot-ok, --dot-warn unchanged: white text on the accent
+     and the pastel dots read fine on dark as well. */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 760px;
+  height: 600px;
+  font-family: var(--sans);
+  color: var(--text);
+  background: var(--bg);
+  font-size: 13px;
+}
+
+/* When opened as a full browser tab, fill the viewport instead of the fixed
+   popup dimensions, giving the code windows all available width/height. */
+body.in-tab {
+  width: 100vw;
+  height: 100vh;
+}
+body.in-tab .results {
+  padding-left: max(14px, calc((100vw - 1100px) / 2));
+  padding-right: max(14px, calc((100vw - 1100px) / 2));
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---- Header ---- */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  box-shadow: var(--shadow);
+}
+
+.header h1 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.1px;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 4px 9px;
+  border-radius: 999px;
+  /* Pushes the account pill (and the theme toggle after it) to the right
+     edge of the header; identical layout while it is the last child. */
+  margin-left: auto;
+}
+
+/* Theme toggle (☾ / ☀ glyph set by JS), right side of the header */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  margin-left: 8px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.theme-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.dot.ok {
+  background: var(--dot-ok);
+}
+.dot.warn {
+  background: var(--dot-warn);
+}
+
+/* ---- Toolbar ---- */
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 14px 8px;
+}
+
+/* ---- Mode toggle (Search / Diff single toggle) ---- */
+.mode-tab {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 11.5px;
+  font-family: var(--sans);
+  font-weight: 600;
+  padding: 5px 14px;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.mode-tab:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.mode-tab.active {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+/* Search row: mode toggle + input + Build/Refresh + menu + options */
+.search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Search options (regex/word/case toggles + sort), right-aligned on the row */
+.search-options {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+}
+
+/* In diff mode only the toggle and ⋯ menu remain — right-align the menu */
+.search-row .menu.diff-mode {
+  margin-left: auto;
+}
+
+.search-wrap {
+  flex: 1;
+}
+
+#search-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+#search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  background: var(--code-bg);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  user-select: none;
+}
+.toggle input {
+  display: none;
+}
+.toggle:has(input:checked) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.sort-select {
+  height: 34px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 11.5px;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+}
+.sort-select:focus {
+  border-color: var(--accent);
+}
+
+/* ---- Search chips ---- */
+.chip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 14px 2px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  max-height: 90px;
+  overflow-y: auto;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  color: var(--accent-strong);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  max-width: 240px;
+}
+.chip-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chip-remove {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 2px;
+  border-radius: 50%;
+}
+.chip-remove:hover {
+  color: var(--danger-text);
+}
+.chip-mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.chip-mode input {
+  display: none;
+}
+.chip-mode:has(input:checked) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.chip-clear-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.chip-clear-all:hover {
+  color: var(--danger-text);
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+/* ---- Compact (multi-match) cards ---- */
+.card-compact .card-line {
+  background: var(--accent-soft);
+}
+.card-count {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.compact-code {
+  border-top: 1px solid var(--border);
+  background: var(--code-bg);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+.gap-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10.5px;
+  padding: 1px 8px 1px 46px;
+  user-select: none;
+}
+.gap-row::before,
+.gap-row::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+}
+.compact-row {
+  display: flex;
+}
+.compact-row .src {
+  padding: 0 10px;
+  white-space: pre;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+}
+
+.btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.btn:hover {
+  box-shadow: var(--shadow);
+}
+.btn-primary {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent-strong);
+  padding: 4px 6px;
+}
+.btn-ghost:hover {
+  background: var(--accent-soft);
+  box-shadow: none;
+}
+.btn-danger {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger-text);
+  font-weight: 600;
+}
+
+/* ---- Subbar ---- */
+.subbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px 6px;
+}
+.subbar-count {
+  padding-top: 0;
+}
+.index-status {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+  padding-left: 8px;
+  white-space: nowrap;
+}
+.subbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.index-status.ok {
+  color: var(--success-text);
+}
+.index-status.warn {
+  color: var(--warn-text);
+}
+.result-count {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ---- Kebab menu ---- */
+.menu {
+  position: relative;
+}
+.menu-toggle {
+  list-style: none;
+  padding: 8px 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.menu-toggle::-webkit-details-marker {
+  display: none;
+}
+.menu-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 10;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-menu);
+  padding: 4px;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+}
+.menu-item {
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+.menu-item:hover {
+  background: var(--accent-soft);
+}
+.menu-item.danger {
+  color: var(--danger-text);
+}
+.menu-item.danger:hover {
+  background: var(--danger-soft);
+}
+.menu-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.menu-check:hover {
+  background: var(--accent-soft);
+}
+.menu-check input {
+  accent-color: var(--accent-strong);
+}
+.menu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 2px;
+}
+.menu-label {
+  padding: 6px 10px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+}
+.menu-input {
+  margin: 2px 10px 4px;
+  padding: 6px 8px;
+  width: calc(100% - 20px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+}
+.menu-input:focus {
+  border-color: var(--accent);
+}
+
+/* ---- Progress ---- */
+.progress {
+  padding: 6px 14px 10px;
+}
+.progress-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-bar span {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
+  transition: width 0.2s;
+}
+.progress-bar span.indeterminate {
+  width: 40% !important;
+  animation: ssnav-indeterminate 1.1s ease-in-out infinite;
+}
+@keyframes ssnav-indeterminate {
+  0% {
+    margin-left: -40%;
+  }
+  100% {
+    margin-left: 100%;
+  }
+}
+.progress-text {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ---- Results ---- */
+.results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  flex: 0 0 auto; /* never shrink: overflow:hidden disables min-height:auto */
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+}
+.card-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 12.5px;
+}
+a.card-name {
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+a.card-name:hover {
+  text-decoration: underline;
+}
+.card-line {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.card-path {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.code {
+  margin: 0;
+  border-top: 1px solid var(--border);
+  background: var(--code-bg);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+.code-row {
+  display: flex;
+}
+.code-row .ln {
+  flex: 0 0 auto;
+  min-width: 38px;
+  text-align: right;
+  padding: 0 8px;
+  color: var(--ln-color);
+  background: var(--surface);
+  user-select: none;
+  border-right: 1px solid var(--border);
+}
+.code-row .src {
+  padding: 0 10px;
+  white-space: pre;
+  color: var(--text);
+}
+.code-row .src.src-wrap {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.code-row .src .ellipsis {
+  color: var(--muted);
+  font-style: italic;
+}
+.code-row.is-match {
+  background: var(--notice-bg);
+}
+.code-row.is-match .ln {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+.card-note {
+  padding: 4px 11px 8px;
+  font-size: 10.5px;
+  color: var(--muted);
+  font-style: italic;
+}
+mark {
+  background: var(--highlight);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+/* ---- Syntax highlighting (lightweight, hand-rolled tokenizer) ---- */
+.tok-comment {
+  color: var(--token-comment);
+  font-style: italic;
+}
+.tok-string,
+.tok-template {
+  color: var(--token-string);
+}
+.tok-keyword {
+  color: var(--token-keyword);
+  font-weight: 600;
+}
+.tok-number {
+  color: var(--token-number);
+}
+.tok-function {
+  color: var(--token-function);
+}
+.tok-regex {
+  color: var(--token-regex);
+}
+.tok-punct {
+  color: var(--token-punct);
+}
+
+/* ---- Empty state ---- */
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  color: var(--muted);
+}
+.empty-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 6px;
+}
+.empty-sub {
+  margin: 0;
+  font-size: 12px;
+  max-width: 300px;
+  line-height: 1.5;
+}
+.empty #empty-build-btn {
+  margin-top: 12px;
+}
+.empty.hidden {
+  display: none;
+}
+
+/* Show more */
+.show-more {
+  align-self: center;
+  margin-top: 2px;
+}
+
+/* Toast / error line */
+.toast {
+  margin: 0 14px 10px;
+  padding: 8px 11px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  background: var(--toast-bg);
+  border: 1px solid var(--danger);
+  color: var(--danger-text);
+}
+.toast.hidden {
+  display: none;
+}
+
+/* ---- Diff view ---- */
+.diff-section {
+  display: none;
+}
+.diff-section.visible {
+  display: block;
+}
+
+.diff-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: relative;
+}
+
+.diff-controls select,
+.diff-controls input[type="text"] {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+  font-family: var(--sans);
+}
+
+.diff-controls select:focus,
+.diff-controls input[type="text"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.diff-controls input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+/* ---- Diff autocomplete ---- */
+.diff-autocomplete {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  box-shadow: var(--shadow-dropdown);
+  z-index: 100;
+}
+.diff-autocomplete.hidden {
+  display: none;
+}
+.diff-autocomplete-item {
+  padding: 6px 10px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.diff-autocomplete-item:hover,
+.diff-autocomplete-item.highlighted {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.diff-autocomplete-item mark {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.diff-autocomplete-empty {
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: italic;
+}
+
+.diff-output {
+  max-height: 400px;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+}
+
+.diff-file-header {
+  position: relative;
+  padding: 8px 11px;
+  background: var(--accent-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.diff-file-header:hover {
+  background-color: var(--header-hover);
+}
+
+.diff-file-header .diff-summary {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.diff-hunk-header {
+  padding: 4px 11px;
+  background: var(--surface);
+  font-size: 10.5px;
+  color: var(--muted);
+  font-family: var(--mono);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.diff-row {
+  display: flex;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  /* Rows size to their content; the whole .diff-output scrolls horizontally */
+  min-width: max-content;
+}
+
+.diff-row .diff-ln {
+  flex: 0 0 auto;
+  min-width: 38px;
+  text-align: right;
+  padding: 0 8px;
+  color: var(--ln-color);
+  background: var(--surface);
+  user-select: none;
+  border-right: 1px solid var(--border);
+  /* Keep line numbers visible while the document scrolls horizontally */
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.diff-row .diff-content {
+  padding: 0 10px;
+  white-space: pre;
+  color: var(--text);
+}
+
+.diff-row.diff-context {
+  background: var(--code-bg);
+}
+
+.diff-row.diff-added {
+  background: var(--success-soft);
+}
+
+.diff-row.diff-added .diff-content {
+  color: var(--diff-add-text);
+}
+
+.diff-row.diff-added .diff-ln {
+  background: var(--success-softer);
+  color: var(--success-text);
+}
+
+.diff-row.diff-removed {
+  background: var(--diff-del-soft);
+}
+
+.diff-row.diff-removed .diff-content {
+  color: var(--danger-text);
+}
+
+.diff-row.diff-removed .diff-ln {
+  background: var(--diff-del-softer);
+  color: var(--diff-del-muted);
+}
+
+.diff-only-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.diff-only-badge.only-base {
+  background: var(--diff-del-softer);
+  color: var(--danger-text);
+}
+
+.diff-only-badge.only-comparison {
+  background: var(--success-softer);
+  color: var(--success-text);
+}
+
+.diff-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.diff-empty.diff-identical {
+  color: var(--success-text);
+}
+
+/* Diff toggle in subbar */
+.diff-toggle-btn {
+  position: relative;
+}
+
+.diff-toggle-btn .diff-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-strong);
+  border: 2px solid var(--bg);
+}
+
+/* ---- Diff banner ---- */
+.diff-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--accent);
+  font-size: 12px;
+  color: var(--text);
+}
+.diff-banner.hidden {
+  display: none;
+}
+.diff-banner > #diff-banner-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Diff folder selector ---- */
+.diff-folder-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding-top: 4px;
+}
+.diff-folder-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.diff-folder-check {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.diff-folder-check input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+.diff-account-select {
+  max-width: 200px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.diff-arrow {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+#diff-clear-base-btn {
+  white-space: nowrap;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+/* ---- Folder diff ---- */
+.diff-folder-header {
+  padding: 8px 11px;
+  background: var(--accent-soft);
+  font-size: 11.5px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.diff-folder-header .diff-summary {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.diff-file-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0;
+  border: none;
+}
+
+/* ---- Collapsible diff regions ---- */
+
+.diff-file-region {
+  /* wrapper for a file's header + body */
+}
+
+.diff-file-header .diff-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-size: 1.1em;
+  font-weight: bold;
+  padding: 0 8px 0 0;
+  line-height: 1;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.diff-file-header .diff-toggle-btn:hover {
+  color: var(--text);
+}
+
+/* Left side wrapper for toggle + path */
+.diff-file-header-left {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Right side stats container */
+.diff-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: 12px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/* Green bubble for additions */
+.diff-stat-added {
+  background: var(--pill-ok-bg);
+  color: var(--pill-ok-text);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--mono);
+}
+
+/* Red bubble for removals */
+.diff-stat-removed {
+  background: var(--pill-err-bg);
+  color: var(--pill-err-text);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--mono);
+}
+
+.diff-file-body {
+  /* wrapper for the file's diff content (hunks, badges, line count) */
+}
+
+.diff-file-body.hidden {
+  display: none;
+}
+
+/* Collapse All / Expand All buttons in diff-controls */
+.diff-controls .diff-bulk-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 4px 8px;
+  font-family: var(--sans);
+  transition: color 0.15s, background 0.15s;
+}
+
+.diff-controls .diff-bulk-toggle:hover {
+  color: var(--text);
+  background: var(--accent-soft);
+}
+
+.diff-controls .diff-bulk-toggle.hidden {
+  display: none;
+}
+
+/* ---- Search result grouping & card collapse ---- */
+
+/* Group header (mirrors diff-file-header) */
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 11px;
+  background: var(--accent-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+.group-head:hover {
+  background: var(--group-hover);
+}
+.group-head .group-toggle {
+  background: none;
+  border: none;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-size: 1.1em;
+  font-weight: bold;
+  padding: 0 8px 0 0;
+  line-height: 1;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.group-head .group-toggle:hover {
+  color: var(--text);
+}
+.group-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-count {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.group-body.hidden {
+  display: none;
+}
+
+/* Card collapse toggle */
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.card-head .card-toggle {
+  background: none;
+  border: none;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-size: 1.1em;
+  font-weight: bold;
+  padding: 0 4px 0 0;
+  line-height: 1;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.card-head .card-toggle:hover {
+  color: var(--text);
+}
+.card-collapsed .code,
+.card-collapsed .compact-code,
+.card-collapsed .card-note {
+  display: none;
+}
+
+/* Sort select (group-by dropdown) */
+.sort-select {
+  min-width: 90px;
+}

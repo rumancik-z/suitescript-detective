@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SuiteScript Navigator</title>
+    <link rel="stylesheet" href="popup.css" />
+    <link rel="stylesheet" href="accounts.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="brand">
+          <span class="logo" aria-hidden="true"></span>
+          <h1>SuiteScript Navigator</h1>
+        </div>
+        <div class="account" id="account">
+          <span class="dot" id="account-dot"></span>
+          <span id="account-label">Checking…</span>
+        </div>
+        <button id="theme-toggle-btn" class="theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">☾</button>
+      </header>
+
+      <section class="toolbar">
+        <div class="search-row">
+          <button type="button" class="mode-tab active" id="mode-toggle-btn" title="Toggle to Diff mode">Search</button>
+          <div class="search-wrap">
+            <input
+              id="search-input"
+              type="search"
+              placeholder="Search across all scripts…"
+              aria-label="Search across all scripts"
+              title="Press Tab to search for multiple terms"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <button id="build-btn" class="btn btn-primary" type="button">
+            Build / Refresh
+          </button>
+          <button id="cancel-btn" class="btn btn-danger hidden" type="button">
+            Cancel
+          </button>
+          <button id="accounts-btn" class="btn btn-ghost" type="button"
+            title="View cached accounts">Accounts</button>
+          <details class="menu" id="menu">
+            <summary class="btn menu-toggle" title="More actions" aria-label="More actions">⋯</summary>
+            <div class="menu-panel">
+              <div class="menu-label">Folders to index</div>
+              <label class="menu-check">
+                <input type="checkbox" id="folder--15" data-folder="-15" />
+                <span>SuiteScripts</span>
+              </label>
+              <label class="menu-check">
+                <input type="checkbox" id="folder--16" data-folder="-16" />
+                <span>SuiteBundles</span>
+              </label>
+              <label class="menu-check">
+                <input type="checkbox" id="folder--19" data-folder="-19" />
+                <span>SuiteApps</span>
+              </label>
+              <div class="menu-sep"></div>
+              <button id="set-diff-base-btn" class="menu-item" type="button">
+                Set as diff base
+              </button>
+              <div class="menu-sep"></div>
+              <label class="menu-check">
+                <input type="checkbox" id="skip-minified" />
+                <span>Skip minified / bundle files</span>
+              </label>
+              <label class="menu-check">
+                <input type="checkbox" id="auto-purge" />
+                <span title="Clears cached source older than 4 hours when you open the extension or start the browser. Does not re-fetch automatically.">Clear cache older than 4 hours on open</span>
+              </label>
+              <div class="menu-sep"></div>
+              <div class="menu-label">
+                <label for="regex-max-lines">Regex skip files over (lines)</label>
+              </div>
+              <input
+                id="regex-max-lines"
+                class="menu-input"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="0 = no limit"
+                title="Skip regex search on files larger than this many lines (0 = no limit)"
+              />
+              <div class="menu-sep"></div>
+              <button id="rebuild-btn" class="menu-item" type="button">
+                Rebuild (full)
+              </button>
+              <button id="clear-btn" class="menu-item danger" type="button">
+                Clear cache
+              </button>
+              <button id="clear-all-btn" class="menu-item danger" type="button">
+                Clear all accounts
+              </button>
+            </div>
+          </details>
+          <div class="search-options">
+            <label class="toggle" title="Treat search as a regular expression">
+              <input type="checkbox" id="regex-toggle" />
+              <span>.*</span>
+            </label>
+            <label class="toggle" title="Whole word match">
+              <input type="checkbox" id="wholeword-toggle" />
+              <span>W</span>
+            </label>
+            <label class="toggle" title="Case sensitive">
+              <input type="checkbox" id="case-toggle" />
+              <span>Aa</span>
+            </label>
+            <select id="sort-select" class="sort-select" title="Group results">
+              <option value="none">None</option>
+              <option value="folder">Folder</option>
+              <option value="type">Script Type</option>
+            </select>
+          </div>
+        </div>
+        <div class="chip-row" id="chip-row">
+          <label class="chip-mode hidden" title="Combine chips with AND or OR">
+            <input type="checkbox" id="chip-mode" aria-label="AND / OR chip mode" />
+            <span id="chip-mode-label">AND</span>
+          </label>
+          <button
+            type="button"
+            id="chip-clear-all"
+            class="chip-clear-all hidden"
+            title="Clear all chips"
+            aria-label="Clear all chips"
+          >×</button>
+          <div class="chips hidden" id="chip-container" aria-label="Search chips"></div>
+          <span id="index-status" class="index-status">No index yet</span>
+        </div>
+      </section>
+
+      <div class="subbar subbar-count" id="results-toolbar">
+        <span id="result-count" class="result-count"></span>
+        <div class="subbar-actions">
+          <button id="export-csv-btn" class="btn btn-ghost hidden" type="button" title="Export results as CSV">
+            Export CSV
+          </button>
+          <button id="open-tab-btn" class="btn btn-ghost" type="button" title="Open in a full browser tab">
+            Open in tab ⤢
+          </button>
+          <button id="results-collapse-all" class="btn btn-ghost hidden" type="button" title="Collapse all result cards">
+            Collapse all
+          </button>
+          <button id="results-expand-all" class="btn btn-ghost hidden" type="button" title="Expand all result cards">
+            Expand all
+          </button>
+        </div>
+      </div>
+
+      <div id="diff-banner" class="diff-banner hidden">
+        <span id="diff-banner-text"></span>
+        <button id="diff-banner-dismiss-btn" class="btn btn-ghost" type="button" title="Dismiss">
+          ✕
+        </button>
+        <div id="diff-folder-select" class="diff-folder-select">
+          <span class="diff-folder-label">Folders to compare:</span>
+          <label class="diff-folder-check">
+            <input type="checkbox" class="diff-folder" data-folder="-15" />
+            <span>SuiteScripts</span>
+          </label>
+          <label class="diff-folder-check">
+            <input type="checkbox" class="diff-folder" data-folder="-16" />
+            <span>SuiteBundles</span>
+          </label>
+          <label class="diff-folder-check">
+            <input type="checkbox" class="diff-folder" data-folder="-19" />
+            <span>SuiteApps</span>
+          </label>
+          <button id="diff-banner-build-btn" class="btn btn-primary" type="button">
+            Build comparison index
+          </button>
+        </div>
+      </div>
+
+      <div id="progress" class="progress hidden">
+        <div class="progress-bar"><span id="progress-fill"></span></div>
+        <span id="progress-text" class="progress-text"></span>
+      </div>
+
+      <section id="diff-section" class="diff-section">
+        <div class="diff-controls">
+          <select
+            id="diff-base-select"
+            class="diff-account-select"
+            title="Diff base account (pick from cached accounts)"
+            aria-label="Diff base account"
+          ></select>
+          <span class="diff-arrow" title="base ↔ comparison">↔</span>
+          <select
+            id="diff-comp-select"
+            class="diff-account-select"
+            title="Comparison account (pick from cached accounts)"
+            aria-label="Comparison account"
+          ></select>
+          <input
+            type="text"
+            id="diff-file-path"
+            placeholder="Folder/file.name.js"
+            aria-label="File path to compare"
+            spellcheck="false"
+          />
+          <div id="diff-autocomplete" class="diff-autocomplete hidden"></div>
+          <button id="diff-compare-btn" class="btn btn-primary" type="button">
+            Compare
+          </button>
+          <button id="diff-bulk-collapse" class="btn btn-ghost diff-bulk-toggle hidden" type="button" title="Collapse all files">Collapse all</button>
+          <button id="diff-bulk-expand" class="btn btn-ghost diff-bulk-toggle hidden" type="button" title="Expand all files">Expand all</button>
+        </div>
+        <div id="diff-output" class="diff-output">
+          <div class="diff-empty">Enter a file path and click Compare</div>
+        </div>
+      </section>
+
+      <!-- ============ Accounts (cached accounts) ============ -->
+      <section id="accounts-section" class="accounts-section hidden"
+        aria-label="Cached accounts">
+        <div id="accounts-usage" class="accounts-usage"></div>
+        <div id="accounts-list" class="accounts-list" aria-live="polite"></div>
+        <div id="accounts-footer" class="accounts-footer hidden">
+          <button id="accounts-clear-all-btn" class="btn btn-danger"
+            type="button">
+            Clear all accounts
+          </button>
+        </div>
+      </section>
+
+      <main id="results" class="results" aria-live="polite"></main>
+
+      <div id="empty" class="empty">
+        <p id="empty-title" class="empty-title">No results yet</p>
+        <p id="empty-sub" class="empty-sub">
+          Open a NetSuite tab, click <em>Build / Refresh</em> to index your
+          scripts, then search across them here.
+        </p>
+        <button id="empty-build-btn" class="btn btn-primary hidden">
+          Build / Refresh
+        </button>
+      </div>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
+

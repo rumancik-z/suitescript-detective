@@ -1,0 +1,133 @@
+/* accounts.css — cached-accounts view (theme variables from popup.css) */
+
+.accounts-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.accounts-usage {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.accounts-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 2px;
+}
+
+.accounts-empty {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 24px 8px;
+  margin: 0;
+}
+
+.account-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 10px 12px;
+}
+
+.account-card.is-current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.account-card.is-base {
+  border-color: var(--accent-2);
+}
+
+.account-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.account-label {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.badge {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.badge-ready {
+  background: var(--success-soft);
+  color: var(--success-text);
+  border-color: var(--success-text);
+}
+
+.badge-build {
+  background: var(--notice-bg);
+  color: var(--warn-text);
+  border-color: var(--warn-text);
+}
+
+.badge-cancelled {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+  border-color: var(--danger-text);
+}
+
+.badge-current {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  border-color: var(--accent);
+}
+
+.badge-base {
+  background: var(--accent-soft);
+  color: var(--success-text);
+  border-color: var(--accent-2);
+}
+
+.account-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+.account-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.account-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+}
+
+.account-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.accounts-footer {
+  display: flex;
+  justify-content: flex-end;
+}

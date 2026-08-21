@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "SuiteScript Navigator",
+  "version": "0.1.0",
+  "description": "Fast, grep-like text search across all SuiteScript files in a NetSuite account.",
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "SuiteScript Navigator"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'self'" },
+  "permissions": ["storage", "unlimitedStorage", "activeTab"],
+  "host_permissions": [
+    "https://*.app.netsuite.com/*",
+    "https://*.netsuite.com/*"
+  ]
+}
+
