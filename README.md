@@ -1,9 +1,12 @@
 # SuiteScript Navigator
 
 A Manifest V3 Chrome extension for fast, grep-like text search across all
-SuiteScript files in a NetSuite account. Vanilla JS + CSS, no build tools, no NPM.
+SuiteScript files in a NetSuite account, plus unified diff between two accounts
+(e.g. Sandbox vs Production). Vanilla JS + CSS, no build tools, no NPM.
 
-See [`STRUCTURE.md`](./STRUCTURE.md) for architecture and code structure, [`PLAN.md`](./PLAN.md) for the roadmap.
+See [`STRUCTURE.md`](./STRUCTURE.md) for architecture and code structure,
+[`PLAN.md`](./PLAN.md) for the roadmap, and [`AUDIT.md`](./AUDIT.md) for the
+security audit trail.
 
 ## Status
 
@@ -29,25 +32,53 @@ See [`STRUCTURE.md`](./STRUCTURE.md) for architecture and code structure, [`PLAN
    `nlapijsonhandler.nl` (cursor-paginated by `internalidnumber`), then downloads
    each file's source via `media.nl` in throttled batches with exponential-backoff
    retries. Sources are cached as per-script shards in `chrome.storage.local`.
-3. Type a term to search the cached corpus in-memory. Each result card shows the
-   **file name**, **folder path**, **line number**, and a **±5-line context window**
-   with the match highlighted. A secondary filter bar narrows results client-side.
+3. Type a term to search the cached corpus in-memory. Press **Tab** to pin the
+   term as a **chip** and add more — chips combine with **AND** (every term must
+   match) or **OR** (any term may match). Matching modes: plain substring,
+   **regex** (`.*`), and **whole-word** (`W`), each with optional case
+   sensitivity. Results can be grouped by **folder** or **script type**. Each
+   result card shows the **file name**, **folder path**, **line number**, and a
+   **context window** (±5 lines, ±3 for multi-match cards) with the match
+   highlighted.
 4. **Diff checker** compares files between two accounts (e.g. Sandbox vs Production)
    with a unified diff view, collapsible file headers, and change-count badges.
 5. **Accounts page** lists every account with cached index data — status,
    script count, last-updated time, and size — with per-account Refresh,
    Set-as-diff-base, and Clear actions.
+6. **Export CSV** downloads the currently visible search results as a UTF-8 CSV
+   (BOM included, so Excel renders Unicode correctly).
+7. **Light/dark theme** — the ☾/☀ toggle in the header persists across sessions
+   and stays in sync when the popup is open in both the sidebar and a full tab.
 
 All requests use `credentials: "include"` to reuse your existing NetSuite session —
 the extension stores no credentials or tokens.
 
-## Load the extension (unpacked)
+## Running locally
 
-1. Open `chrome://extensions`.
-2. Enable **Developer mode** (top-right).
-3. Click **Load unpacked** and select this project folder.
-4. Open a NetSuite tab, then click the extension icon.
+There is no build step and no dependency install — the repo *is* the extension.
+
+**Prerequisites**
+
+- A Chromium-based browser (Chrome or Edge, 111+ — the service worker is an
+  ES module).
+- A NetSuite account you're already logged into in that browser. The extension
+  reuses your existing session; it never stores credentials.
+
+**Load it**
+
+1. Clone the repo (or copy the folder).
+2. Open `chrome://extensions`.
+3. Enable **Developer mode** (top-right).
+4. Click **Load unpacked** and select the project folder.
+5. Open a NetSuite tab, then click the extension icon.
    - The account chip shows `Account <id>` when a NetSuite tab is detected.
+
+**Development loop**
+
+After editing any file, click the **↻ reload** button on the extension's card
+in `chrome://extensions` (service-worker changes only take effect on reload),
+then reopen the popup. There is no test suite or linter to run; `node --check`
+on the JS files is a quick syntax sanity check.
 
 ## Usage
 
@@ -56,8 +87,14 @@ the extension stores no credentials or tokens.
 | Control | Action |
 | --- | --- |
 | **Search box** | Substring search across all cached scripts (debounced). |
+| **Tab** (in the search box) | Pins the current term as a **chip** and clears the box so you can keep adding terms. **Backspace** on an empty box removes the last chip. |
+| **Chips + AND/OR toggle** | Each chip is an extra search term. The **AND/OR** toggle switches how chips combine (AND = every term must match, OR = any term may match). Click a chip's **×** to remove just that term. |
+| **.\*** toggle | Treat the term as a regular expression. Regex runs in a dedicated worker with a 4-second hard timeout; see **Regex skip files over (lines)** below. |
+| **W** toggle | Whole-word match only. |
 | **Aa** toggle | Case-sensitive matching. |
-| **Filter results bar** | Appears after search results load. Filters the already-retrieved results client-side (no additional network calls). |
+| **Group select** | Groups results by **Folder** or **Script Type** (default **None**). |
+| **Export CSV** | Downloads the currently visible results as a UTF-8 CSV (BOM included for Excel). |
+| **Collapse all / Expand all** | Bulk-collapse or expand the result cards. |
 
 ### Indexing
 
@@ -68,6 +105,7 @@ the extension stores no credentials or tokens.
 | **⋯ → Rebuild (full)** | Clears the cache and re-downloads everything from scratch. |
 | **⋯ → Folders to index** | Checkboxes for **SuiteScripts** (`-15`), **SuiteBundles** (`-16`), and **SuiteApps** (`-19`). Only checked folders are inventoried/downloaded on the next build. The selection is remembered and persists correctly across extension reopen. |
 | **⋯ → Skip minified / bundle files** | When checked, skips minified/bundled assets (e.g. `*.min.js`, content-hashed bundle files, or any file with a very long line) — the main storage hogs. Applies at **download** time and **retroactively at search time**, so already-cached minified files are excluded from results without re-indexing. The setting is remembered. |
+| **⋯ → Regex skip files over (lines)** | Numeric setting (0 = no limit). When the regex toggle is on, files with more lines than this are skipped so a pathological pattern can't stall the search on a huge file. |
 | **⋯ → Clear cache older than 4 hours on open** | *(On by default.)* Security/hygiene: when the background worker starts — browser startup, or the popup reopening after the worker has gone idle — any cache whose last build is older than **4 hours** is cleared, so cached source and any embedded secrets don't linger. The purge runs once at worker start (a plain status/view refresh never clears a cache), and if it cleared anything the popup says so once. It does **not** auto-re-pull — opening stays instant; click **Build / Refresh** when you want fresh data. |
 | **⋯ → Clear cache** | Removes the cached data for **this** account only (other accounts' caches are kept). |
 | **⋯ → Clear all accounts** | Removes the cached data for **every** account (with its own confirm). |
@@ -110,10 +148,12 @@ Compare scripts between two NetSuite accounts (e.g. Sandbox vs Production) with 
 | --- | --- |
 | **Open in tab ⤢** | Opens the interface as a full browser tab that fills the viewport — handy for wider code/context windows. The account ID is preserved when opening from an existing tab. |
 | **Result file name (link)** | Opens the file's record in NetSuite in a **background tab**, so the popup stays open and your search is preserved — click several results in a row. Ctrl/⌘/middle-click behaves like a normal link. Your last query is also remembered if the popup is reopened. |
+| **☾ / ☀** | Toggles the light/dark theme (persisted; stays in sync if the popup is open in the sidebar and as a tab at once). |
 
 The **index status** line (under the toolbar) shows the cached script count,
-approximate storage used, and last-updated time. It warns when storage is nearly
-full or when a previous build was left incomplete.
+approximate storage used, and last-updated time. It warns when a previous build
+was left incomplete, or when storage is nearly full (the latter only when the
+user declined `unlimitedStorage` at install).
 
 ## Hardening details (Phase 6)
 
@@ -125,16 +165,20 @@ full or when a previous build was left incomplete.
 - **Rate-limit friendliness** — concurrent batches (`BATCH_SIZE`) with an
   inter-batch delay, plus exponential backoff + jitter on HTTP 429/5xx. Individual
   file failures are recorded and skipped; the build never hard-stops on one file.
-- **Storage guardrails** — usage is estimated via `getBytesInUse`; the UI warns at
-  ≥85% of quota (`QUOTA_WARN_RATIO`).
+- **Storage guardrails** — usage is estimated via `getBytesInUse`; the UI warns
+  at ≥85% of quota (`QUOTA_WARN_RATIO`) when `unlimitedStorage` was not granted
+  (Chrome asks for it at install; with it granted the quota is unbounded and the
+  warning is inert).
+- **Regex search isolation** — regex queries run in a dedicated worker
+  (`lib/regexSearchWorker.js`) with a 4-second hard timeout (`REGEX_TIMEOUT_MS`),
+  so catastrophic backtracking can't wedge the popup.
 
 ## Limitations
 
-- **Live response shape (needs confirmation).** The inventory parser
-  (`extractRows` / `readColumn` in `lib/netsuiteClient.js`) is written defensively
-  but without a captured `jrr=T` response. If **Build / Refresh** reports 0 scripts
-  on a real account, that parser is the single place to adjust once a real response
-  is available.
+- **0 scripts after Build / Refresh.** The inventory parser (`extractRows` /
+  `readColumn` in `lib/netsuiteClient.js`) is written defensively against the
+  `jrr=T` response; if an account reports 0 scripts, that parser is the single
+  place to adjust.
 - **Scope.** v1 indexes `filetype JAVASCRIPT` files in the script folders
   SuiteScripts (`-15`), SuiteBundles (`-16`), and SuiteApps (`-19`). Other file
   types are out of scope.
@@ -159,28 +203,33 @@ full or when a previous build was left incomplete.
       current account's index (other accounts' caches are kept).
 - [ ] Accounts page lists every cached account; per-account Refresh / Set as
       diff base / Clear and "Clear all accounts" behave as labelled.
-- [ ] Index-status line shows count, size, and updated time; warns near quota.
+- [ ] Index-status line shows count, size, and updated time; warns when a build
+      was left incomplete.
 
 ## Icons
 
 The manifest does not reference icons yet, so Chrome uses a default placeholder.
-Drop `icon16.png`, `icon48.png`, `icon128.png` into `icons/` and add an `icons`
-block + `action.default_icon` to `manifest.json` when ready.
+Drop `icon16.png`, `icon32.png`, `icon48.png`, `icon128.png` into `icons/` and
+add an `icons` block + `action.default_icon` to `manifest.json` when ready
+(the 32 px icon is required for the Chrome Web Store listing).
 
 ## File layout
 
 ```
-manifest.json        MV3 manifest (permissions, action, module service worker)
+manifest.json        MV3 manifest (permissions, CSP, action, module service worker)
 background.js        Service worker: message router + build orchestrator
+AUDIT.md             Security audit + re-audit trail
 STRUCTURE.md         Architecture guide for agents and contributors
 PLAN.md              Implementation plan + future enhancements roadmap
-popup/               popup.html · popup.css · popup.js (UI, theme, rendering)
+popup/               popup.html · popup.css · popup.js (UI, theme, chips, rendering)
                      accounts.js · accounts.css (cached-accounts page: fetch + render)
 lib/
   constants.js       Endpoints, folder ids, batch/throttle config, message types, @typedefs
-  accountResolver.js Active-tab → baseHost + accountId
-  netsuiteClient.js  Inventory + pagination + media.nl content download
-  searchEngine.js    In-memory line matcher + context window builder
+  accountResolver.js Account resolution (active tab → last used → any NetSuite tab)
+  netsuiteClient.js  Inventory + pagination + media.nl download (URL-validated)
+  searchEngine.js    Search facade used by the service worker
+  query.js           Query model: term matchers (substring/regex/word), AND/OR chips, scan
+  regexSearchWorker.js Dedicated worker for regex searches (hard timeout)
   storage.js         chrome.storage.local wrapper (meta/inventory/source/comparison)
   diffEngine.js      LCS-based line-level diff algorithm
   fuzzyMatch.js      Fuzzy string matching for file path autocomplete

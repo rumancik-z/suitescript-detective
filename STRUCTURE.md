@@ -37,12 +37,13 @@ SuiteScriptNavigator/
     ├── constants.js           # Endpoints, folder IDs, batch sizes, storage keys, message types, @typedefs
     ├── accountResolver.js     # Detect NetSuite account from active tab URL
     ├── netsuiteClient.js      # Inventory pagination + content download with retry/backoff
-    ├── searchEngine.js        # In-memory line search + context window builder
+    ├── searchEngine.js        # Search facade for the service worker (delegates to query.js)
+    ├── query.js               # Query model: term matchers (substring/regex/word), AND/OR chips, scan
+    ├── regexSearchWorker.js   # Dedicated worker for regex searches (hard timeout)
     ├── storage.js             # chrome.storage.local wrapper (per-account meta/inventory/sources, settings, diff state)
     ├── highlight.js           # Lightweight JS tokenizer for syntax highlighting
     ├── diffEngine.js          # LCS-based line-level diff algorithm
-    ├── fuzzyMatch.js          # Fuzzy string matching for file path autocomplete
-    └── demoData.js            # Placeholder/demo data (not actively used in production)
+    └── fuzzyMatch.js          # Fuzzy string matching for file path autocomplete
 ```
 
 ---
