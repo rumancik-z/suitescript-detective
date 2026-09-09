@@ -7,6 +7,7 @@ import {
   CHAR_CONTEXT,
   COMPACT_CONTEXT_RADIUS,
   NETSUITE_HOST_RE,
+  ACCOUNT_ID_RE,
   FULL_DIFF_LINE_CAP,
 } from "../lib/constants.js";
 import { getSettings, setSettings } from "../lib/storage.js";
@@ -714,12 +715,12 @@ const resolveAccount = async () => {
         originUrl = null;
       }
       if (originUrl && originUrl.protocol === "https:" && NETSUITE_HOST_RE.test(originUrl.hostname)) {
-        // Only trust the parameter for real account hosts (numeric first
-        // label, e.g. 1234567-sb1). Non-account hosts (e.g.
-        // login.netsuite.com) are ignored and fall through to the worker
-        // round-trip below, which enforces the same rule.
+        // Only trust the parameter for real account hosts (account-style
+        // first label, e.g. 1234567-sb1 or td2927492). Non-account hosts
+        // (e.g. login.netsuite.com) are ignored and fall through to the
+        // worker round-trip below, which enforces the same rule.
         const firstLabel = originUrl.hostname.split(".")[0] || "";
-        const idMatch = firstLabel.match(/^(\d+)(?:-[a-z0-9]+)?$/i);
+        const idMatch = firstLabel.match(ACCOUNT_ID_RE);
         if (idMatch) {
           el.accountLabel.textContent = `Account ${firstLabel}`;
           el.accountDot.classList.add("ok");
