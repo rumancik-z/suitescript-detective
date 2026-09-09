@@ -1,4 +1,4 @@
-# SuiteScript Navigator — Security, Efficiency & Improvement Audit
+# SuiteScript Detective — Security, Efficiency & Improvement Audit
 
 **Date:** 2026-08-06
 **Updated:** 2026-08-14 — per-account cache scoping implemented (see FIXED findings below)
@@ -225,11 +225,14 @@ Move it into `storage.js` alongside `getSourceMetaMap` and use
 `STORAGE_KEYS.COMPARISON_SRC_PREFIX`.
 
 ### [LOW] `unlimitedStorage` disables the near-quota guard
-With `unlimitedStorage`, `getUsage()` reports an infinite quota and `ratio` is
-always 0, so the "storage almost full" warning never appears and the cache can
-grow without bound. The skip-minified option mitigates this. Consider tracking
-`getBytesInUse` against an internal soft cap (e.g., 500 MB) to keep the guard
-meaningful, or at least surface actual byte usage in the status line.
+With `unlimitedStorage`, `getUsage()` reported an infinite quota and `ratio`
+was always 0, so the "storage almost full" warning never appeared and the
+cache could grow without bound. The skip-minified option mitigates this.
+Consider tracking `getBytesInUse` against an internal soft cap (e.g., 500 MB)
+to keep the guard meaningful, or at least surface actual byte usage in the
+status line. (Resolved in v0.0.7 — `getUsage()` now evaluates `ratio` against
+the effective ~2 GB `unlimitedStorage` cap, so the ≥85% near-quota warning
+works again.)
 
 ### [LOW] Search is a brute-force substring scan
 `lib/searchEngine.js` lowercases every line on every search (`line.toLowerCase()`
@@ -297,7 +300,7 @@ exist; it's only in comments so it never fails at runtime, but it is misleading.
   `tab.url` visibility for the `*.netsuite.com` tab queries comes from
   `host_permissions`; the unused `alarms` permission was removed too;
   see `lib/accountResolver.js` comment).
-- **Add icons** (the README notes none are shipped) so the action uses a real icon.
+- **Add icons** (the README notes none are shipped) so the action uses a real icon. (Resolved in v0.0.7 — icons/icon16|32|48|128.png wired into the manifest.)
 - **Surface the failed-file list** (retry-on-request) instead of silently skipping,
   and **show actual storage bytes** even under `unlimitedStorage`.
 - **Cap `diffLines` inputs** and **trim equal prefix/suffix lines** before computing

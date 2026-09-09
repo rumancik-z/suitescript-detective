@@ -1,4 +1,4 @@
-# SuiteScript Navigator — Implementation Plan
+# SuiteScript Detective — Implementation Plan
 
 > A Manifest V3 Chrome Extension that performs fast, "grep-like" text searches across
 > **all** SuiteScript files in a NetSuite account, without navigating the NetSuite UI.
@@ -161,13 +161,13 @@ Use broad NetSuite wildcards so any account works:
 ```jsonc
 {
   "manifest_version": 3,
-  "name": "SuiteScript Navigator",
-  "version": "1.0.0",
-  "action": { "default_popup": "popup/popup.html", "default_icon": { /* 16/48/128 */ } },
+  "name": "SuiteScript Detective",
+  "version": "0.0.7",
+  "action": { "default_popup": "popup/popup.html", "default_icon": { /* 16/32/48/128 */ } },
   "background": { "service_worker": "background.js", "type": "module" },
   "permissions": ["storage", "unlimitedStorage", "activeTab"],
   "host_permissions": ["https://*.app.netsuite.com/*", "https://*.netsuite.com/*"],
-  "icons": { "16": "...", "48": "...", "128": "..." }
+  "icons": { "16": "...", "32": "...", "48": "...", "128": "..." }
 }
 ```
 
@@ -687,7 +687,7 @@ Aesthetic guidelines:
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
-| **Name change to SuiteDetective** | v2 | Rename the extension from "SuiteScript Navigator" to "SuiteDetective" (or similar). Update manifest, HTML title, and all branding references. Consider A/B testing or user feedback before finalizing. |
+| ~~**Name change to SuiteDetective**~~ | **DONE (v0.0.7)** | Renamed to "SuiteScript Detective" (manifest name/title, popup header/tab titles, docs). Internal `ssnav` storage-key namespace left unchanged (pre-existing caches remain valid). |
 
 ### 14.11 About & Info
 

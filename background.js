@@ -5,6 +5,7 @@ import {
   RESULT_CAP,
   SCRIPT_FOLDERS,
   CACHE_TTL_MS,
+  FULL_DIFF_LINE_CAP,
 } from "./lib/constants.js";
 import { resolveAccount, parseAccountFromUrl, recordLastAccount } from "./lib/accountResolver.js";
 import {
@@ -13,6 +14,7 @@ import {
   getAllSources,
   setInventory,
   putSource,
+  removeStaleSources,
   getSourceMetaMap,
   getUsage,
   clearAccountCache,
@@ -268,6 +270,8 @@ const purgeIfStale = async () => {
 
   let purged = false;
   for (const id of await getCachedAccountIds()) {
+    // Re-check per account: a build may have started after the entry check.
+    if (buildInProgress) return purged;
     const m = await getMeta(id);
     if (m && isExpired(m.builtAt || m.updatedAt)) {
       await clearAccountCache(id);
@@ -389,7 +393,10 @@ const searchMsg = async (msg) => {
   let sources = await getAllSources(currentLabel);
 
   const settings = await getSettings();
-  if (settings.skipMinified) {
+  // Minified/bundled records are excluded when the setting is on, and ALWAYS
+  // for regex searches: a pathological pattern on their very long lines
+  // cannot be interrupted in-process and would hang the service worker.
+  if (settings.skipMinified || msg.regex) {
     sources = sources.filter((s) => !isMinifiedRecord(s));
   }
   // Skip regex search on very large files when the user has set a cap.
@@ -429,6 +436,10 @@ const searchMsg = async (msg) => {
  * @returns {Promise<object>}
  */
 const runIndexBuild = async (msg, account, resultPhase) => {
+  // Wait for the spawn-time stale-cache purge to settle so it cannot clear
+  // shards this build writes (or skips as unchanged) mid-build.
+  if (purgePromise) await purgePromise;
+
   // Store the full account identifier including suffix (e.g., 1234567-sb1)
   // so it matches diffState and statusMsg.currentAccount exactly.
   const accountLabel = account.baseHost.split(".")[0] || account.accountId;
@@ -527,6 +538,24 @@ const runIndexBuild = async (msg, account, resultPhase) => {
     }
 
     const cached = await getAllSources(accountLabel);
+
+    // Prune shards for files that no longer exist in the inventory (deleted
+    // from the account). Safe only when every script folder was inventoried —
+    // a partial-folder build would otherwise delete shards belonging to
+    // folders it didn't pull.
+    const coversAllFolders =
+      folders.length === SCRIPT_FOLDERS.length &&
+      folders.every((f) => SCRIPT_FOLDERS.includes(f));
+    let pruned = 0;
+    if (coversAllFolders) {
+      const keep = new Set(entries.map((e) => String(e.internalId)));
+      const stale = cached.filter((s) => !keep.has(String(s.internalId)));
+      if (stale.length) {
+        await removeStaleSources(accountLabel, stale);
+        pruned = stale.length;
+      }
+    }
+
     const usage = await getUsage();
 
     await setMeta(accountLabel, {
@@ -534,7 +563,7 @@ const runIndexBuild = async (msg, account, resultPhase) => {
       origin: account.origin || null,
       status: "ready",
       cursor,
-      scriptCount: cached.length,
+      scriptCount: cached.length - pruned,
       downloaded: result.downloaded,
       skipped: result.skipped,
       skippedMinified: result.skippedMinified,
@@ -544,7 +573,7 @@ const runIndexBuild = async (msg, account, resultPhase) => {
       updatedAt: Date.now(),
     });
 
-    const scriptCount = cached.length;
+    const scriptCount = cached.length - pruned;
     return {
       type: MSG.INDEX_READY,
       phase: resultPhase,
@@ -556,8 +585,8 @@ const runIndexBuild = async (msg, account, resultPhase) => {
       usage,
       message:
         resultPhase === "comparison-ready"
-          ? `Comparison index ready: ${scriptCount} scripts cached (${result.downloaded} downloaded, ${result.skipped} already cached).`
-          : `Index ready: ${scriptCount} scripts cached (${result.downloaded} downloaded, ${result.skipped} already cached).`,
+          ? `Comparison index ready: ${scriptCount} scripts cached (${result.downloaded} downloaded, ${result.skipped} already cached${result.failed ? `, ${result.failed} failed` : ""}).`
+          : `Index ready: ${scriptCount} scripts cached (${result.downloaded} downloaded, ${result.skipped} already cached${result.failed ? `, ${result.failed} failed` : ""}).`,
     };
   } catch (err) {
     return { type: MSG.ERROR, message: err?.message || String(err) };
@@ -641,15 +670,6 @@ const finishCancelled = async (
 };
 
 /**
- * Handle a COMPARE_FILES message.
- * @param {{type: string, folderPath: string, name: string}} msg
- * @returns {Promise<object>}
- */
-// Cap for full-file diffs (files that exist in only one account).
-// Very large files would create too many DOM rows.
-const FULL_DIFF_LINE_CAP = 2000;
-
-/**
  * Build a single hunk containing all lines as additions (+).
  * Caps at FULL_DIFF_LINE_CAP lines to avoid rendering massive files.
  * @param {string[]} lines
@@ -685,6 +705,11 @@ const buildFullDeleteHunk = (lines) => {
   }];
 };
 
+/**
+ * Handle a COMPARE_FILES message.
+ * @param {{type: string, folderPath: string, name: string}} msg
+ * @returns {Promise<object>}
+ */
 const compareFilesMsg = async (msg) => {
   const folderPath = msg.folderPath || "";
   const name = msg.name || "";

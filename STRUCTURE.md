@@ -6,7 +6,7 @@
 
 ## Project Summary
 
-**SuiteScript Navigator** is a Chrome Manifest V3 extension that indexes all SuiteScript (`.js`) files in a NetSuite account and provides fast, grep-like text search with context windows. It also includes a diff checker for comparing files between two accounts (e.g., Sandbox vs Production) — both the base and the comparison account can be picked from the cached-accounts list — and a popup-only **Accounts** page that lists every cached account with per-account Refresh / Set-as-diff-base / Clear actions.
+**SuiteScript Detective** is a Chrome Manifest V3 extension that indexes all SuiteScript (`.js`) files in a NetSuite account and provides fast, grep-like text search with context windows. It also includes a diff checker for comparing files between two accounts (e.g., Sandbox vs Production) — both the base and the comparison account can be picked from the cached-accounts list — and a popup-only **Accounts** page that lists every cached account with per-account Refresh / Set-as-diff-base / Clear actions.
 
 - **Stack:** Vanilla JavaScript + CSS, no build tools, no NPM, no frameworks
 - **Runtime:** Chrome Extension Manifest V3 (ES Modules)
@@ -39,7 +39,6 @@ SuiteScriptNavigator/
     ├── netsuiteClient.js      # Inventory pagination + content download with retry/backoff
     ├── searchEngine.js        # Search facade for the service worker (delegates to query.js)
     ├── query.js               # Query model: term matchers (substring/regex/word), AND/OR chips, scan
-    ├── regexSearchWorker.js   # Dedicated worker for regex searches (hard timeout)
     ├── storage.js             # chrome.storage.local wrapper (per-account meta/inventory/sources, settings, diff state)
     ├── highlight.js           # Lightweight JS tokenizer for syntax highlighting
     ├── diffEngine.js          # LCS-based line-level diff algorithm
@@ -163,7 +162,7 @@ SuiteScriptNavigator/
 - Result card layout with file name, folder, line number, context window
 - Diff view styling: file headers, collapsible regions, green/red line badges, hunk headers
 - Progress bar with determinate/indeterminate states
-- Responsive layout for tab mode (`body.tab-mode` class)
+- Responsive layout for tab mode (`body.in-tab` class)
 
 ---
 
@@ -440,7 +439,7 @@ Three-layer check (pre-fetch, post-fetch, retroactive):
 - Build never hard-stops on one file failure
 
 ### Tab Mode
-"Open in tab" opens `popup.html` as a full browser tab. Account ID is passed via `?account=XXXXX` URL parameter. CSS class `body.tab-mode` adjusts layout for full-viewport rendering. Full tabs are single-purpose: the Accounts page (popup-only) is hidden in them.
+"Open in tab" opens `popup.html?tab=1[&diff=1][&origin=<url-encoded NetSuite origin>]` as a full browser tab (`onOpenTab` builds the URL from the popup's state). `detectTabMode()` reads the `tab`/`diff` params to lock the tab to search or diff mode and adds the `in-tab` class to `<body>` for full-viewport layout; `resolveAccount()` reads the `origin` param to pin the account the popup had when the tab was opened. Full tabs are single-purpose: the Accounts page (popup-only) is hidden in them.
 
 ### Auto-Purge
 On worker spawn (in `background.js`, chained onto the `migrationPromise`) and on browser startup (`chrome.runtime.onStartup`): if `autoPurgeStale` is enabled, `purgeIfStale()` clears each expired per-account cache independently when its own `builtAt` is older than 4 hours (`CACHE_TTL_MS`). Status queries never trigger a purge — view switches used to, which deleted stale caches while the user was still looking at them; instead `GET_STATUS` reports the spawn-time result via `purged`, and the popup toasts once at init. Does NOT auto-rebuild — user clicks Build/Refresh manually.

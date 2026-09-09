@@ -7,6 +7,7 @@ import {
   CHAR_CONTEXT,
   COMPACT_CONTEXT_RADIUS,
   NETSUITE_HOST_RE,
+  FULL_DIFF_LINE_CAP,
 } from "../lib/constants.js";
 import { getSettings, setSettings } from "../lib/storage.js";
 import { tokenizeLine } from "../lib/highlight.js";
@@ -251,8 +252,8 @@ const detectTabMode = () => {
     document.body.classList.add("in-tab");
     el.openTabBtn.classList.add("hidden");
     document.title = isDiffTab
-      ? "SuiteScript Navigator — Diff"
-      : "SuiteScript Navigator";
+      ? "SuiteScript Detective — Diff"
+      : "SuiteScript Detective";
     // Hide the mode toggle: search tabs must not initiate diff mode, and diff
     // tabs stay in diff mode. Full tabs are single-purpose, so the accounts
     // page is popup-only as well.
@@ -713,16 +714,19 @@ const resolveAccount = async () => {
         originUrl = null;
       }
       if (originUrl && originUrl.protocol === "https:" && NETSUITE_HOST_RE.test(originUrl.hostname)) {
-        // Construct account info from the URL parameter
+        // Only trust the parameter for real account hosts (numeric first
+        // label, e.g. 1234567-sb1). Non-account hosts (e.g.
+        // login.netsuite.com) are ignored and fall through to the worker
+        // round-trip below, which enforces the same rule.
         const firstLabel = originUrl.hostname.split(".")[0] || "";
         const idMatch = firstLabel.match(/^(\d+)(?:-[a-z0-9]+)?$/i);
-        const accountId = idMatch ? idMatch[1] : firstLabel;
-
-        el.accountLabel.textContent = `Account ${firstLabel}`;
-        el.accountDot.classList.add("ok");
-        el.buildBtn.disabled = false;
-        state.accountOrigin = originParam;
-        return;
+        if (idMatch) {
+          el.accountLabel.textContent = `Account ${firstLabel}`;
+          el.accountDot.classList.add("ok");
+          el.buildBtn.disabled = false;
+          state.accountOrigin = originParam;
+          return;
+        }
       }
     }
 
@@ -835,6 +839,10 @@ const onBuild = async (mode = "delta", folders = null) => {
  */
 const onBuildFinished = (res) => {
   const wasActive = state.buildActive;
+  // Invalidate in-flight watchdog ticks: a tick that already captured this
+  // buildId but is still awaiting GET_STATUS must not run onBuildFinished a
+  // second time once the INDEX_READY/CANCELLED/ERROR broadcast lands.
+  state.buildId += 1;
   state.buildActive = false;
   state.buildKind = null;
   stopBuildWatchdog();
@@ -847,8 +855,11 @@ const onBuildFinished = (res) => {
     refreshStatus();
     if (state.lastTerm) onSearch();
   } else if (res?.type === MSG.INDEX_READY) {
+    // Any finished base-side build rewrites the base account's sources
+    // (half of the cached comparison file union), so the diff autocomplete
+    // file list is stale — invalidate unconditionally.
+    state.comparisonFilesCache = null;
     if (res.phase === "comparison-ready") {
-      state.comparisonFilesCache = null;
       setProgress(1, 1, res.message || "Comparison index updated.");
       setTimeout(hideProgress, 4500);
       // Refresh so the diff banner/labels reflect the finished comparison
@@ -937,6 +948,9 @@ const startBuildWatchdog = () => {
         stopBuildWatchdog();
         state.buildActive = false;
         state.buildKind = null;
+        // Invalidate in-flight ticks so a late one cannot re-run
+        // onBuildFinished on the just-reset UI.
+        state.buildId += 1;
         hideProgress();
         setBuildingUI(false);
         showToast("Build stalled — check the service worker and try again.");
@@ -961,7 +975,7 @@ const stopBuildWatchdog = () => {
 // ---- Open the popup as a full browser tab ----
 
 /**
- * Open the Navigator in a dedicated browser tab.
+ * Open the Detective in a dedicated browser tab.
  * @returns {void}
  */
 const onOpenTab = () => {
@@ -1263,11 +1277,6 @@ const hideProgress = () => {
 // ---- Search ----
 
 /**
- * Handler for search input changes (debounced). Queries the service worker
- * and renders matching hits.
- * @returns {Promise<void>}
- */
-/**
  * Add a term to the chip list and re-run the search.
  * @param {string} value - Term to add as a chip.
  * @returns {void}
@@ -1313,6 +1322,11 @@ const renderChips = () => {
   el.chipModeLabel.textContent = state.chipMode === "and" ? "AND" : "OR";
 };
 
+/**
+ * Handler for search input changes (debounced). Queries the service worker
+ * and renders matching hits.
+ * @returns {Promise<void>}
+ */
 const onSearch = async () => {
   // Skip search if in diff mode
   if (state.mode === "diff") {
@@ -2477,78 +2491,94 @@ const handleSetDiffBase = async () => {
 };
 
 /**
- * Render diff hunks into a container element.
- * @param {DiffHunk[]} hunks - Array of diff hunks to render.
- * @param {HTMLElement} container - Container to append hunks into.
+ * Walk a hunk's full line list assigning each line its true 1-based old/new
+ * line number (null on the side that line does not consume).
+ * @param {DiffHunk} hunk
+ * @returns {Array<{line: DiffLine, oldNum: number|null, newNum: number|null}>}
  */
+const annotateHunkLines = (hunk) => {
+  let oldNum = hunk.oldStart;
+  let newNum = hunk.newStart;
+  return hunk.lines.map((line) => {
+    const item = { line, oldNum: null, newNum: null };
+    if (line.type === "|") { item.oldNum = oldNum; item.newNum = newNum; oldNum++; newNum++; }
+    else if (line.type === "-") { item.oldNum = oldNum; oldNum++; }
+    else { item.newNum = newNum; newNum++; }
+    return item;
+  });
+};
+
 /**
- * Filter hunk lines to show at most `ctxLimit` context lines around each
- * group of changes, deduplicating overlapping context between adjacent changes.
- * @param {DiffLine[]} lines
+ * Filter annotated hunk lines to show at most `ctxLimit` context lines around
+ * each group of changes, deduplicating overlapping context between adjacent
+ * changes.
+ * @param {Array<{line: DiffLine, oldNum: number|null, newNum: number|null}>} items
  * @param {number} ctxLimit
- * @returns {DiffLine[]}
+ * @returns {Array<{line: DiffLine, oldNum: number|null, newNum: number|null}>}
  */
-const filterHunkLines = (lines, ctxLimit) => {
+const filterHunkLines = (items, ctxLimit) => {
   const changes = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].type !== "|") changes.push(i);
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].line.type !== "|") changes.push(i);
   }
-  if (changes.length === 0) return lines;
+  if (changes.length === 0) return items;
   const include = new Set();
   for (const ci of changes) {
     include.add(ci);
     for (let j = ci - ctxLimit; j < ci; j++) {
-      if (j >= 0 && lines[j].type === "|") include.add(j);
+      if (j >= 0 && items[j].line.type === "|") include.add(j);
     }
     for (let j = ci + 1; j <= ci + ctxLimit; j++) {
-      if (j < lines.length && lines[j].type === "|") include.add(j);
+      if (j < items.length && items[j].line.type === "|") include.add(j);
     }
   }
   const sorted = [...include].sort((a, b) => a - b);
-  return sorted.map(i => lines[i]);
+  return sorted.map(i => items[i]);
 };
 
+/**
+ * Render diff hunks into a container element.
+ * @param {DiffHunk[]} hunks - Array of diff hunks to render.
+ * @param {HTMLElement} container - Container to append hunks into.
+ * @param {number} [ctxLimit] - Max context lines around changes (optional).
+ */
 const renderHunks = (hunks, container, ctxLimit) => {
   for (const hunk of hunks) {
-    // Optionally filter context lines
-    const lines = (ctxLimit !== undefined && ctxLimit !== null)
-      ? filterHunkLines(hunk.lines, ctxLimit)
-      : hunk.lines;
+    // Annotate the full line list with true line numbers first, then
+    // optionally filter context lines — so numbers stay correct even when
+    // leading/internal context is dropped by the filter.
+    const items = (ctxLimit != null)
+      ? filterHunkLines(annotateHunkLines(hunk), ctxLimit)
+      : annotateHunkLines(hunk);
 
     // Compute header counts from (possibly filtered) lines
     let filtOld = 0, filtNew = 0;
-    for (const l of lines) {
-      if (l.type !== "+") filtOld++;
-      if (l.type !== "-") filtNew++;
+    for (const item of items) {
+      if (item.line.type !== "+") filtOld++;
+      if (item.line.type !== "-") filtNew++;
     }
 
-    // Hunk header
+    // Hunk header (true start, filtered counts — acceptable for a filtered view)
     const hunkHeader = document.createElement("div");
     hunkHeader.className = "diff-hunk-header";
     hunkHeader.textContent = `@@ -${hunk.oldStart},${filtOld} +${hunk.newStart},${filtNew} @@`;
     container.appendChild(hunkHeader);
 
-    // Render lines
-    let oldLineNum = hunk.oldStart;
-    let newLineNum = hunk.newStart;
-    for (const line of lines) {
+    // Render lines using the pre-computed true line numbers
+    for (const item of items) {
       const row = document.createElement("div");
       let rowClass = "diff-row";
       let lnText = "";
 
-      if (line.type === "|") {
+      if (item.line.type === "|") {
         rowClass += " diff-context";
-        lnText = `${oldLineNum}  ${newLineNum}`;
-        oldLineNum++;
-        newLineNum++;
-      } else if (line.type === "-") {
+        lnText = `${item.oldNum}  ${item.newNum}`;
+      } else if (item.line.type === "-") {
         rowClass += " diff-removed";
-        lnText = `${oldLineNum}  `;
-        oldLineNum++;
+        lnText = `${item.oldNum}  `;
       } else {
         rowClass += " diff-added";
-        lnText = `    ${newLineNum}`;
-        newLineNum++;
+        lnText = `    ${item.newNum}`;
       }
 
       row.className = rowClass;
@@ -2559,7 +2589,7 @@ const renderHunks = (hunks, container, ctxLimit) => {
 
       const contentSpan = document.createElement("span");
       contentSpan.className = "diff-content";
-      contentSpan.textContent = line.value;
+      contentSpan.textContent = item.line.value;
 
       row.appendChild(lnSpan);
       row.appendChild(contentSpan);
@@ -2739,7 +2769,7 @@ const renderDiffResult = (result) => {
       const info = document.createElement("div");
       info.className = "diff-file-header";
       info.style.background = "var(--surface)";
-      info.innerHTML = `<span style="color: var(--muted); font-size: 10.5px;">${lineCount} line${lineCount !== 1 ? 's' : ''}${lineCount >= 2000 ? ' (capped at 2000)' : ''}</span>`;
+      info.innerHTML = `<span style="color: var(--muted); font-size: 10.5px;">${lineCount} line${lineCount !== 1 ? 's' : ''}${lineCount >= FULL_DIFF_LINE_CAP ? ` (capped at ${FULL_DIFF_LINE_CAP})` : ''}</span>`;
       body.appendChild(info);
       renderHunks(hunks, body, 2);
     }
@@ -2756,7 +2786,7 @@ const renderDiffResult = (result) => {
       const info = document.createElement("div");
       info.className = "diff-file-header";
       info.style.background = "var(--surface)";
-      info.innerHTML = `<span style="color: var(--muted); font-size: 10.5px;">${lineCount} line${lineCount !== 1 ? 's' : ''}${lineCount >= 2000 ? ' (capped at 2000)' : ''}</span>`;
+      info.innerHTML = `<span style="color: var(--muted); font-size: 10.5px;">${lineCount} line${lineCount !== 1 ? 's' : ''}${lineCount >= FULL_DIFF_LINE_CAP ? ` (capped at ${FULL_DIFF_LINE_CAP})` : ''}</span>`;
       body.appendChild(info);
       renderHunks(hunks, body, 2);
     }
@@ -2843,7 +2873,7 @@ const renderFolderDiffResult = (result) => {
         const info = document.createElement("div");
         info.className = "diff-file-header";
         info.style.background = "var(--surface)";
-        info.innerHTML = `<span style="color: var(--muted); font-size: 10.5px;">${lineCount} line${lineCount !== 1 ? 's' : ''}${lineCount >= 2000 ? ' (capped at 2000)' : ''}</span>`;
+        info.innerHTML = `<span style="color: var(--muted); font-size: 10.5px;">${lineCount} line${lineCount !== 1 ? 's' : ''}${lineCount >= FULL_DIFF_LINE_CAP ? ` (capped at ${FULL_DIFF_LINE_CAP})` : ''}</span>`;
         body.appendChild(info);
         renderHunks(file.hunks, body, 2);
       }
@@ -2860,7 +2890,7 @@ const renderFolderDiffResult = (result) => {
         const info = document.createElement("div");
         info.className = "diff-file-header";
         info.style.background = "var(--surface)";
-        info.innerHTML = `<span style="color: var(--muted); font-size: 10.5px;">${lineCount} line${lineCount !== 1 ? 's' : ''}${lineCount >= 2000 ? ' (capped at 2000)' : ''}</span>`;
+        info.innerHTML = `<span style="color: var(--muted); font-size: 10.5px;">${lineCount} line${lineCount !== 1 ? 's' : ''}${lineCount >= FULL_DIFF_LINE_CAP ? ` (capped at ${FULL_DIFF_LINE_CAP})` : ''}</span>`;
         body.appendChild(info);
         renderHunks(file.hunks, body, 2);
       }
@@ -2939,8 +2969,12 @@ const formatWhen = (ts) => {
   return new Date(ts).toLocaleDateString();
 };
 
+/** Pending auto-hide timer for the toast (so a new toast resets the countdown). */
+let toastTimer = null;
+
 /**
- * Display a toast notification. Auto-hides after 5s.
+ * Display a toast notification. Auto-hides after 5s; successive toasts
+ * reset the countdown instead of stacking hidden timers.
  * @param {string} message - Message to display.
  * @returns {void}
  */
@@ -2953,7 +2987,8 @@ const showToast = (message) => {
   }
   toast.textContent = message;
   toast.classList.remove("hidden");
-  setTimeout(() => toast.classList.add("hidden"), 5000);
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.add("hidden"), 5000);
 };
 
 // ---- Diff autocomplete ----

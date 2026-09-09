@@ -171,7 +171,7 @@ body.in-tab .results {
   width: 20px;
   height: 20px;
   border-radius: 6px;
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  background: url("../icons/icon128.png") center / contain no-repeat;
   box-shadow: var(--shadow);
 }
 

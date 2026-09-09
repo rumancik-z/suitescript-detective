@@ -1,4 +1,4 @@
-# SuiteScript Navigator
+# SuiteScript Detective
 
 A Manifest V3 Chrome extension for fast, grep-like text search across all
 SuiteScript files in a NetSuite account, plus unified diff between two accounts
@@ -89,7 +89,7 @@ on the JS files is a quick syntax sanity check.
 | **Search box** | Substring search across all cached scripts (debounced). |
 | **Tab** (in the search box) | Pins the current term as a **chip** and clears the box so you can keep adding terms. **Backspace** on an empty box removes the last chip. |
 | **Chips + AND/OR toggle** | Each chip is an extra search term. The **AND/OR** toggle switches how chips combine (AND = every term must match, OR = any term may match). Click a chip's **×** to remove just that term. |
-| **.\*** toggle | Treat the term as a regular expression. Regex runs in a dedicated worker with a 4-second hard timeout; see **Regex skip files over (lines)** below. |
+| **.\*** toggle | Treat the term as a regular expression. Regex runs in the service worker with a 4-second deadline-checked scan; see **Regex skip files over (lines)** below. |
 | **W** toggle | Whole-word match only. |
 | **Aa** toggle | Case-sensitive matching. |
 | **Group select** | Groups results by **Folder** or **Script Type** (default **None**). |
@@ -167,11 +167,16 @@ user declined `unlimitedStorage` at install).
   file failures are recorded and skipped; the build never hard-stops on one file.
 - **Storage guardrails** — usage is estimated via `getBytesInUse`; the UI warns
   at ≥85% of quota (`QUOTA_WARN_RATIO`) when `unlimitedStorage` was not granted
-  (Chrome asks for it at install; with it granted the quota is unbounded and the
-  warning is inert).
-- **Regex search isolation** — regex queries run in a dedicated worker
-  (`lib/regexSearchWorker.js`) with a 4-second hard timeout (`REGEX_TIMEOUT_MS`),
-  so catastrophic backtracking can't wedge the popup.
+  (Chrome asks for it at install; with it granted the warning is evaluated
+  against the effective ~2 GB `unlimitedStorage` cap instead of the old
+  ~10 MB one).
+- **Regex search isolation** — regex queries run in the service worker through
+  a deadline-checked cooperative scan that aborts after 4 seconds
+  (`REGEX_TIMEOUT_MS`), and minified/bundled records are always excluded from
+  regex searches, so slow scans abort instead of wedging the UI. Residual
+  limitation: a pathological pattern (e.g. nested quantifiers like `(a+)+`) on
+  a single long non-minified line can still stall the service worker until
+  Chrome recycles it; the **Max regex lines** setting narrows the exposure.
 
 ## Limitations
 
@@ -183,10 +188,11 @@ user declined `unlimitedStorage` at install).
   SuiteScripts (`-15`), SuiteBundles (`-16`), and SuiteApps (`-19`). Other file
   types are out of scope.
 - **Storage quota.** The extension requests `unlimitedStorage`, so the ~10 MB
-  `chrome.storage.local` cap no longer applies and the near-quota warning is
-  disabled. To keep the cache lean anyway, enable **Skip minified / bundle
-  files** (⋯ menu) — minified/bundled assets are the biggest space consumers and
-  are rarely useful to grep.
+  `chrome.storage.local` cap no longer applies; the near-quota warning is
+  evaluated against the effective ~2 GB `unlimitedStorage` cap instead. To keep
+  the cache lean anyway, enable **Skip minified / bundle files** (⋯ menu) —
+  minified/bundled assets are the biggest space consumers and are rarely useful
+  to grep.
 - **Read-only.** No editing/saving scripts back to NetSuite.
 
 ## Manual QA checklist
@@ -208,10 +214,11 @@ user declined `unlimitedStorage` at install).
 
 ## Icons
 
-The manifest does not reference icons yet, so Chrome uses a default placeholder.
-Drop `icon16.png`, `icon32.png`, `icon48.png`, `icon128.png` into `icons/` and
-add an `icons` block + `action.default_icon` to `manifest.json` when ready
-(the 32 px icon is required for the Chrome Web Store listing).
+Icons live in `icons/` (`icon16.png`, `icon32.png`, `icon48.png`,
+`icon128.png`), generated from the source artwork in `netsuitedetective.png`.
+The manifest references all four sizes via the top-level `icons` block and
+`action.default_icon`. The 128 px icon doubles as the Chrome Web Store listing
+image (CWS requires a 128×128 icon).
 
 ## File layout
 
@@ -229,7 +236,6 @@ lib/
   netsuiteClient.js  Inventory + pagination + media.nl download (URL-validated)
   searchEngine.js    Search facade used by the service worker
   query.js           Query model: term matchers (substring/regex/word), AND/OR chips, scan
-  regexSearchWorker.js Dedicated worker for regex searches (hard timeout)
   storage.js         chrome.storage.local wrapper (meta/inventory/source/comparison)
   diffEngine.js      LCS-based line-level diff algorithm
   fuzzyMatch.js      Fuzzy string matching for file path autocomplete
